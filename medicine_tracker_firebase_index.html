@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123b35">
+<title>Medicine Expiry Tracker</title>
+<style>
+:root{--bg:#f4f7f5;--card:#fff;--ink:#172a27;--muted:#6c7c77;--line:#e2eae6;--green:#176b55;--green2:#e7f4ee;--red:#b42318;--redbg:#fff0ee;--amber:#946200;--amberbg:#fff6df;--shadow:0 8px 28px #173b3010}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:linear-gradient(120deg,#123b35,#1b6954);color:#fff;padding:26px 18px 32px}
+.wrap{max-width:1120px;margin:auto;padding:0 16px}header .wrap{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap}
+h1{font-size:clamp(24px,4vw,34px);margin:0 0 5px}header p{margin:0;color:#d5e9e1}
+.pill{border:1px solid #ffffff50;border-radius:30px;padding:8px 12px;font-size:13px;color:#e7f4ee}
+main{max-width:1120px;margin:-14px auto 40px;padding:0 16px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat,.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.stat{padding:16px}.stat span{display:block;color:var(--muted);font-size:13px}.stat strong{display:block;font-size:27px;margin-top:4px}
+.panel{padding:18px;margin-bottom:16px}.panel h2{font-size:18px;margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}.field.wide{grid-column:span 2}label{font-size:13px;font-weight:650;color:#42534e}
+input,select{width:100%;border:1px solid #d6e1dc;border-radius:10px;padding:11px 12px;font:inherit;background:#fff;color:var(--ink);min-width:0}
+input:focus,select:focus{outline:2px solid #a7d7c4;border-color:var(--green)}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+button,.filebtn{border:0;border-radius:10px;padding:10px 15px;font:600 14px system-ui;cursor:pointer;background:var(--green);color:white}
+button.secondary,.filebtn{background:#edf3f0;color:#23433a;border:1px solid var(--line)}
+button.danger{background:var(--redbg);color:var(--red)}button:disabled{opacity:.5;cursor:not-allowed}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.toolbar input{flex:1;min-width:190px}.toolbar select{width:auto;min-width:160px}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);font-size:13px}th{background:#f7faf8;color:#53645e;font-weight:700}tr:last-child td{border-bottom:0}
+.status{display:inline-block;padding:4px 8px;border-radius:20px;font-size:12px;font-weight:700}.ok{background:var(--green2);color:var(--green)}.soon{background:var(--amberbg);color:var(--amber)}.expired{background:var(--redbg);color:var(--red)}
+.rowactions{display:flex;gap:6px}.rowactions button{padding:6px 9px;font-size:12px}
+.empty{text-align:center;padding:30px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin:12px 0 0}.notice{padding:12px 14px;border-radius:12px;background:#eef5ff;color:#24466c;font-size:13px;margin-bottom:14px}
+.hidden{display:none!important}.footer{color:var(--muted);font-size:12px;text-align:center;margin:20px 0}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.field.wide{grid-column:span 2}.panel{padding:14px}.stat{padding:13px}.stat strong{font-size:23px}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><div><h1>Medicine Expiry Tracker</h1><p>Track stock, batches and expiry dates — before they become a loss.</p></div><div class="pill" id="accountStatus">🔒 Not signed in</div></div></header>
+<main>
+<section class="panel" id="loginPanel">
+<h2>☁️ Cloud sync & Google login</h2>
+<p class="note">Sign in with the same Google account on both phones. Your medicine records will sync through Firebase.</p>
+<div class="actions"><button type="button" id="loginBtn">Sign in with Google</button><button type="button" class="secondary hidden" id="logoutBtn">Sign out</button><button type="button" class="secondary hidden" id="uploadLocalBtn">Upload this device's saved records</button></div>
+<p class="note" id="syncMessage">Please sign in to load your cloud medicine stock.</p>
+</section>
+<section class="stats">
+ <div class="stat"><span>Total stock units</span><strong id="totalQty">0</strong></div>
+ <div class="stat"><span>Medicine batches</span><strong id="totalBatches">0</strong></div>
+ <div class="stat"><span>Expiring within 90 days</span><strong id="soonCount">0</strong></div>
+ <div class="stat"><span>Expired batches</span><strong id="expiredCount">0</strong></div>
+</section>
+<div class="notice">Cloud sync works after Google sign-in. Keep using Export backup regularly as an extra safety copy. Do not clear browser data until your records have appeared in the cloud.</div>
+<section class="panel">
+<h2 id="formTitle">＋ Add medicine batch</h2>
+<form id="medicineForm">
+<div class="grid">
+ <div class="field wide"><label for="name">Medicine name *</label><input id="name" required placeholder="e.g. Paracetamol 500 mg"></div>
+ <div class="field"><label for="pack">Packaging / pack size</label><input id="pack" placeholder="e.g. Strip of 10 / Bottle 100 ml"></div>
+ <div class="field"><label for="qty">Quantity in stock *</label><input id="qty" type="number" min="0" step="1" required placeholder="e.g. 25"></div>
+ <div class="field"><label for="price">Price (₹)</label><input id="price" type="number" min="0" step="0.01" placeholder="e.g. 125.00"></div>
+ <div class="field"><label for="packingDate">Packing / Mfg. date</label><input id="packingDate" type="month"></div>
+ <div class="field"><label for="expiry">Expiry date *</label><input id="expiry" type="month" required></div>
+</div>
+<div class="actions"><button type="submit" id="saveBtn">Save medicine</button><button type="button" class="secondary hidden" id="cancelEdit">Cancel edit</button><button type="reset" class="secondary" id="clearForm">Clear form</button></div>
+<p class="note">Add each batch separately, even if the medicine name is the same. This helps track different expiry dates.</p>
+</form>
+</section>
+<section class="panel">
+<h2>Medicine stock</h2>
+<div class="toolbar">
+<input id="search" placeholder="🔎 Search medicine name, batch or rack...">
+<select id="filter"><option value="all">All batches</option><option value="soon">Expiring within 90 days</option><option value="expired">Expired</option><option value="ok">Not expiring soon</option></select>
+<select id="sort"><option value="expiry">Sort: Earliest expiry</option><option value="name">Sort: Medicine name</option><option value="qty">Sort: Quantity (high to low)</option></select>
+</div>
+<div class="tablewrap"><table><thead><tr><th>Medicine</th><th>Packaging</th><th>Quantity</th><th>Price (₹)</th><th>Packing date</th><th>Expiry</th><th>Status</th><th>Action</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" class="empty">No medicines added yet. Add your first batch above.</div></div>
+<div class="actions">
+<button class="secondary" id="exportJson">Export backup (JSON)</button>
+<button class="secondary" id="exportCsv">Export stock (CSV)</button>
+<label class="filebtn" for="importFile">Import backup</label><input class="hidden" type="file" id="importFile" accept=".json,application/json">
+</div>
+<p class="note">JSON backup preserves all fields and can be imported later. CSV is useful for opening the stock list in Excel.</p>
+</section>
+<p class="footer">Medicine Expiry Tracker · Check physical stock and manufacturer-labelled expiry before dispensing.</p>
+</main>
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAIXPJYReMhw_WROtFEaXjVT1njOXY5R4Q",
+  authDomain: "medicine-tracker-71a74.firebaseapp.com",
+  projectId: "medicine-tracker-71a74",
+  storageBucket: "medicine-tracker-71a74.firebasestorage.app",
+  messagingSenderId: "611029543287",
+  appId: "1:611029543287:web:016cc57eaf903c26129972",
+  measurementId: "G-GKBWYX7KXS"
+};
+
+const DB='medicine-expiry-tracker-v1';
+let items=[], editingId=null, currentUser=null, unsubscribeCloud=null, cloudReady=false;
+const $=id=>document.getElementById(id);
+const monthNow=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
+function statusOf(exp){if(!exp)return 'ok';const [y,m]=exp.split('-').map(Number);const expiryEnd=new Date(y,m,0,23,59,59,999);const today=new Date();today.setHours(0,0,0,0);const days=(expiryEnd-today)/86400000;if(days<0)return 'expired';if(days<=90)return 'soon';return 'ok'}
+function expiryLabel(v){if(!v)return '—';const [y,m]=v.split('-');return `${m}/${y}`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function localSave(){try{localStorage.setItem(DB,JSON.stringify(items));return true}catch(e){console.warn('Local backup unavailable',e);return false}}
+function loadLocal(){try{const a=JSON.parse(localStorage.getItem(DB)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
+function setMessage(t){$('syncMessage').textContent=t}
+function render(){const q=$('search').value.trim().toLowerCase(),f=$('filter').value,s=$('sort').value;const total=items.reduce((a,x)=>a+(Number(x.qty)||0),0);$('totalQty').textContent=total.toLocaleString('en-IN');$('totalBatches').textContent=items.length;$('soonCount').textContent=items.filter(x=>statusOf(x.expiry)==='soon').length;$('expiredCount').textContent=items.filter(x=>statusOf(x.expiry)==='expired').length;
+let list=items.filter(x=>[x.name,x.pack].join(' ').toLowerCase().includes(q)).filter(x=>f==='all'||statusOf(x.expiry)===f);list.sort((a,b)=>s==='name'?a.name.localeCompare(b.name):s==='qty'?b.qty-a.qty:(a.expiry||'9999-99').localeCompare(b.expiry||'9999-99'));
+$('rows').innerHTML=list.map(x=>{const st=statusOf(x.expiry),label=st==='expired'?'EXPIRED':st==='soon'?'EXPIRING SOON':'OK';return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.pack||'—')}</td><td><b>${Number(x.qty).toLocaleString('en-IN')}</b></td><td>${x.price===''||x.price==null?'—':Number(x.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>${expiryLabel(x.packingDate)}</td><td><b>${expiryLabel(x.expiry)}</b></td><td><span class="status ${st}">${label}</span></td><td><div class="rowactions"><button class="secondary" data-edit="${esc(x.id)}">Edit</button><button class="danger" data-del="${esc(x.id)}">Delete</button></div></td></tr>`}).join('');$('empty').classList.toggle('hidden',list.length>0)}
+function resetForm(){editingId=null;$('medicineForm').reset();$('formTitle').textContent='＋ Add medicine batch';$('saveBtn').textContent='Save medicine';$('cancelEdit').classList.add('hidden')}
+function userCollection(){return db.collection('users').doc(currentUser.uid).collection('medicines')}
+async function saveCloudItem(item){if(!currentUser||!cloudReady){alert('Please sign in and wait for cloud sync before editing.');return false}try{await userCollection().doc(String(item.id)).set(item);return true}catch(e){console.error(e);alert('Cloud save failed: '+(e.message||e));return false}}
+$('medicineForm').addEventListener('submit',async e=>{e.preventDefault();const data={name:$('name').value.trim(),pack:$('pack').value.trim(),qty:Number($('qty').value),price:$('price').value===''?'':Number($('price').value),packingDate:$('packingDate').value,expiry:$('expiry').value};if(!data.name||!data.expiry||!Number.isFinite(data.qty)||data.qty<0)return;if(data.packingDate&&data.packingDate>data.expiry&&!confirm('Packing/Mfg. date is after the expiry month. Save anyway?'))return;if(!currentUser||!cloudReady){alert('Sign in with Google and wait for sync before saving.');return}
+let item;if(editingId){const old=items.find(x=>x.id===editingId);item={...old,...data}}else item={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),...data,createdAt:new Date().toISOString()};if(await saveCloudItem(item)){resetForm()}});
+$('cancelEdit').onclick=resetForm;$('clearForm').onclick=()=>setTimeout(resetForm,0);
+function edit(id){if(!cloudReady){alert('Wait for cloud sync to finish.');return}const x=items.find(x=>x.id===id);if(!x)return;editingId=id;for(const k of ['name','pack','qty','price','packingDate','expiry'])$(k).value=x[k]??'';$('formTitle').textContent='✎ Edit medicine batch';$('saveBtn').textContent='Update medicine';$('cancelEdit').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})}
+async function removeItem(id){const x=items.find(x=>x.id===id);if(!currentUser||!cloudReady){alert('Please wait for cloud sync.');return}if(x&&confirm(`Delete ${x.name}? This will delete it from both phones.`)){try{await userCollection().doc(String(id)).delete()}catch(e){alert('Delete failed: '+e.message)}}}
+$('rows').addEventListener('click',e=>{const eb=e.target.closest('[data-edit]'),dbtn=e.target.closest('[data-del]');if(eb)edit(eb.dataset.edit);if(dbtn)removeItem(dbtn.dataset.del)});
+['search','filter','sort'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));
+function download(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('exportJson').onclick=()=>download('medicine-stock-backup.json',JSON.stringify({app:'Medicine Expiry Tracker',version:1,exportedAt:new Date().toISOString(),items},null,2),'application/json');
+$('exportCsv').onclick=()=>{const cols=['name','pack','qty','price','packingDate','expiry'];const csv=[cols.join(','),...items.map(x=>cols.map(k=>'"'+String(x[k]??'').replace(/"/g,'""')+'"').join(','))].join('\r\n');download('medicine-stock.csv','\ufeff'+csv,'text/csv;charset=utf-8')};
+async function importRecords(incoming,label){if(!currentUser||!cloudReady){alert('Please sign in and wait for cloud sync first.');return}if(!Array.isArray(incoming))throw Error('Invalid backup');const valid=incoming.filter(x=>x&&x.name&&x.expiry);if(!confirm(`${label}: upload/merge ${valid.length} medicine records to this Google account? Records with the same ID will be updated; other records will be kept.`))return;setMessage('Uploading records…');try{const col=userCollection();for(let i=0;i<valid.length;i+=400){const batch=db.batch();valid.slice(i,i+400).forEach((x,j)=>{const id=String(x.id||`import-${Date.now()}-${i+j}`);batch.set(col.doc(id),{...x,id,qty:Number(x.qty)||0})});await batch.commit()}setMessage('Backup uploaded. Cloud sync is active on this account.');alert('Records uploaded. Keep your original backup file until you verify the stock on both phones.')}catch(e){setMessage('Upload failed: '+e.message);alert('Upload failed: '+e.message)}}
+$('importFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const parsed=JSON.parse(await file.text()),incoming=Array.isArray(parsed)?parsed:parsed.items;await importRecords(incoming,'Import backup')}catch(err){alert('Could not import this file. '+err.message)}e.target.value=''};
+$('uploadLocalBtn').onclick=()=>importRecords(loadLocal(),'Upload this device\'s saved records');
+
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(), db=firebase.firestore();
+$('loginBtn').onclick=async()=>{try{const provider=new firebase.auth.GoogleAuthProvider();await auth.signInWithRedirect(provider)}catch(e){alert('Google sign-in failed: '+e.message)}};
+$('logoutBtn').onclick=()=>auth.signOut();
+auth.getRedirectResult().catch(e=>{console.error(e);setMessage('Sign-in issue: '+e.message)});
+auth.onAuthStateChanged(user=>{currentUser=user;cloudReady=false;if(unsubscribeCloud){unsubscribeCloud();unsubscribeCloud=null}if(!user){$('accountStatus').textContent='🔒 Not signed in';$('loginBtn').classList.remove('hidden');$('logoutBtn').classList.add('hidden');$('uploadLocalBtn').classList.add('hidden');items=loadLocal();render();setMessage('Sign in with Google to load cloud stock. Local records on this browser are still kept.');return}
+$('accountStatus').textContent='☁️ '+(user.email||'Signed in');$('loginBtn').classList.add('hidden');$('logoutBtn').classList.remove('hidden');$('uploadLocalBtn').classList.remove('hidden');setMessage('Connecting to your cloud stock…');
+unsubscribeCloud=userCollection().onSnapshot(snap=>{items=snap.docs.map(d=>({...d.data(),id:d.id}));cloudReady=true;localSave();render();setMessage(`Live sync active · ${items.length} medicine records · ${user.email}`)},err=>{console.error(err);cloudReady=false;setMessage('Cloud access error: '+err.message+' Check Firestore Rules.')});
+});
+</script>
+</body></html>
